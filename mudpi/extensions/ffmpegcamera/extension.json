@@ -1,0 +1,8 @@
+{
+	"name": "FFMpeg Camera",
+	"namespace": "ffmpegcamera",
+	"details": {
+		"description": "Camera module using Ffmpeg"
+	},
+	"requirements": ["ffmpeg"]
+}
