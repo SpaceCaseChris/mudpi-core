@@ -1,0 +1,8 @@
+{
+	"name": "SOC Temperature Sensor",
+	"namespace": "soc_temp_sensor",
+	"details": {
+		"description": "Displays the SOC temperature"
+	},
+	"requirements": ["vcgencmd"]
+}
