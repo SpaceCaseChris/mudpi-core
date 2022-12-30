@@ -1,0 +1,8 @@
+{
+	"name": "Storage Sensor",
+	"namespace": "storage_sensor",
+	"details": {
+		"description": "Displays the used and total storage and a percentage representation of the same."
+	},
+	"requirements": []
+}
