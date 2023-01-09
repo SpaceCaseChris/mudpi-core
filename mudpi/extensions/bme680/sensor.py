@@ -41,6 +41,12 @@ class Interface(BaseInterface):
                     addr = int(addr, 16)
 
                 conf['address'] = addr
+            
+            if not conf.get('unit_system'):
+                conf['unit_system'] = "c"
+            else:
+                if( conf['unit_system'] != "c" or conf['unit_system'] != "f"):
+                    conf['unit_system'] = "c"
 
         return config
 
@@ -72,6 +78,9 @@ class BME680Sensor(Sensor):
         """ Classification further describing it, effects the data formatting """
         return 'climate'
 
+    @property
+    def unit_system(self):
+        return self.config['unit_system']
 
     """ Methods """
     def init(self):
@@ -87,7 +96,11 @@ class BME680Sensor(Sensor):
 
     def update(self):
         """ Get data from BME680 device"""
-        temperature = round((self._sensor.temperature - 5) * 1.8 + 32, 2)
+        if(self.unit_system == "f"):
+            temperature = round((self._sensor.temperature - 5) * 1.8 + 32, 2)
+        else:
+            temperature = round(self._sensor.temperature, 2)
+            
         gas = self._sensor.gas
         humidity = round(self._sensor.humidity, 1)
         pressure = round(self._sensor.pressure, 2)
