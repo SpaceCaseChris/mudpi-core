@@ -5,12 +5,12 @@
 """
 import board
 import adafruit_bme680
-
+from mudpi.logger.Logger import Logger, LOG_LEVEL
 from busio import I2C
 from mudpi.extensions import BaseInterface
 from mudpi.extensions.sensor import Sensor
 from mudpi.exceptions import MudPiError, ConfigError
-
+from mudpi.constants import IMPERIAL_SYSTEM, METRIC_SYSTEM
 
 class Interface(BaseInterface):
 
@@ -72,6 +72,12 @@ class BME680Sensor(Sensor):
         """ Classification further describing it, effects the data formatting """
         return 'climate'
 
+    @property
+    def unit_system(self):
+        if not self.config.get('unit_system'):
+            return self.mudpi.unit_system
+        else:
+            return METRIC_SYSTEM if self.config['unit_system'] == 'metric' else IMPERIAL_SYSTEM
 
     """ Methods """
     def init(self):
@@ -87,7 +93,7 @@ class BME680Sensor(Sensor):
 
     def update(self):
         """ Get data from BME680 device"""
-        temperature = round((self._sensor.temperature - 5) * 1.8 + 32, 2)
+        temperature = round(self._sensor.temperature if self.unit_system == METRIC_SYSTEM else (self._sensor.temperature * 1.8 + 32), 2)
         gas = self._sensor.gas
         humidity = round(self._sensor.humidity, 1)
         pressure = round(self._sensor.pressure, 2)
@@ -104,8 +110,7 @@ class BME680Sensor(Sensor):
             self._state = readings
             return readings
         else:
-            Logger.log(
-                LOG_LEVEL["error"],
+            Logger.warn(
                 'Failed to get reading [BME680]. Try again!'
             )
 
