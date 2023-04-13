@@ -7,12 +7,11 @@ import socket
 from mudpi.extensions import BaseInterface
 from mudpi.extensions.sensor import Sensor
 from mudpi.constants import IMPERIAL_SYSTEM
-from nanpy import (ArduinoApi, SerialManager, DHT)
+from nanpy import (ArduinoApi, SerialManager, DHT, Ultrasonic)
 from mudpi.logger.Logger import Logger, LOG_LEVEL
 from nanpy.serialmanager import SerialManagerError
 from mudpi.exceptions import MudPiError, ConfigError
 from nanpy.sockconnection import (SocketManager, SocketManagerError)
-
 
 class Interface(BaseInterface):
     def load(self, config):
@@ -25,6 +24,8 @@ class Interface(BaseInterface):
         elif config['type'].lower() == 'dallas_temperature':
             # sensor = OneWireSensor(self.mudpi, config) NOT IMPLMENTED YET
             pass
+        elif config['type'].lower() == 'ultrasonic':
+            sensor = NanpyUltrasonicSensor(self.mudpi, config)
 
         if sensor:
             node = self.extension.nodes[config['node']]
@@ -74,7 +75,14 @@ class Interface(BaseInterface):
                     # raise ConfigError(f'Missing `address` in Nanpy dallas_temperature sensor {conf['key']} config.')
                     pass
                 conf['classifier'] = 'temperature'
-                    
+            elif conf['type'].lower() == 'ultrasonic':     
+                tPin = conf.get('trigger_pin')
+                ePin = conf.get('echo_pin')
+                if not tPin and tPin != 0:
+                    raise ConfigError(f'Missing `trigger_pin` in Nanpy dht sensor {conf["key"]} config.')
+                if not ePin and ePin != 0:
+                    raise ConfigError(f'Missing `echo_pin` in Nanpy dht sensor {conf["key"]} config.')
+                conf['classifier'] = 'general'
             if not conf.get('classifier'):
                 # Default the sensor classifier
                 conf['classifier'] = 'general'
@@ -239,3 +247,79 @@ class NanpyDHTSensor(Sensor):
         else:
             self._dht = False
         return None
+
+class NanpyUltrasonicSensor(Sensor):
+    """ Nanpy Ultrasonic Sensor
+        Get readings from Ultrasonic Sensor via Nanpy's Ultrasonic library
+    """
+
+    """ Properties """
+    @property
+    def id(self):
+        """ Return a unique id for the component """
+        return self.config['key']
+
+    @property
+    def name(self):
+        """ Return the display name of the component """
+        return self.config.get('name') or f"{self.id.replace('_', ' ').title()}"
+    
+    @property
+    def state(self):
+        """ Return the state of the component (from memory, no IO!) """
+        return self._state
+
+    @property
+    def classifier(self):
+        """ Classification further describing it, effects the data formatting """
+        return 'general'
+
+    @property
+    def analog(self):
+        """ Return if gpio is digital or analog """
+        return self.config.get('analog', False)
+
+    @property
+    def echoPin(self):
+        """ Get the echo pin  """
+        return int(self.config.get('echo_pin'))
+
+    @property
+    def triggerPin(self):
+        """ Get the trigger pin  """
+        return int(self.config.get('trigger_pin'))
+
+    """ Methods """
+    def init(self):
+        """ Connect to the Parent Device """
+        self._state = None
+        self._ultrasonic = None
+        self._pin_setup = False
+        return True
+
+    def update(self):
+        """ Get data from Ultrasonic through nanpy"""
+        if self.node.connected:
+            self.check_connection()
+            try:
+                data = None
+                data = self._ultrasonic.get_distance()
+                self._state = data
+            except (SerialManagerError, SocketManagerError,
+                    BrokenPipeError, ConnectionResetError, OSError,
+                    socket.timeout) as e:
+                if self.node.connected:
+                    Logger.log_formatted(LOG_LEVEL["warning"],
+                           f'{self.node.key} -> Broken Connection', 'Timeout', 'notice')
+                    self.node.reset_connection()
+                self._pin_setup = True
+        else:
+            self._pin_setup = False
+        return None
+
+    def check_connection(self):
+        """ Check connection to node and gpio """
+        if self.node.connected:
+            if not self._pin_setup:
+                self._ultrasonic = Ultrasonic(self.echoPin, self.triggerPin, False, connection=self.node.connection)
+                self._pin_setup = True
